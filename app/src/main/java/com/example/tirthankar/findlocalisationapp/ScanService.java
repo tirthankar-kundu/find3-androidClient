@@ -28,6 +28,7 @@ import org.json.JSONException;
 import org.json.JSONObject;
 
 import java.io.UnsupportedEncodingException;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Timer;
 import java.util.TimerTask;
@@ -104,17 +105,31 @@ public class ScanService extends Service{
         Log.d(TAG, "familyName: " + familyName +" server "+serverAddress);
 
         Timer timer = new Timer();
-        timer.scheduleAtFixedRate(new TimerTask() {
-            @Override
-            public void run() {
-                Log.d(TAG,"scheduler");
-                synchronized (lock) {
-                    if (isScanning == false) {
-                        doScan();
+        if(!tracking) {
+            timer.scheduleAtFixedRate(new TimerTask() {
+                @Override
+                public void run() {
+                    Log.d(TAG, "scheduler");
+                    synchronized (lock) {
+                        if (isScanning == false) {
+                            doScan();
+                        }
                     }
                 }
-            }
-        }, 1000, 10000);
+            }, 1000, 10000);
+        }else{
+            timer.scheduleAtFixedRate(new TimerTask() {
+                @Override
+                public void run() {
+                    Log.d(TAG, "scheduler");
+                    synchronized (lock) {
+                        if (isScanning == false) {
+                            doScan();
+                        }
+                    }
+                }
+            }, 1000, 1000);
+        }
 
         return START_STICKY;
     }
@@ -220,60 +235,114 @@ public class ScanService extends Service{
         try {
             String URL = serverAddress + "/data";
             Log.d(TAG,"url:"+URL);
-            jsonBody.put("f", familyName);
-            jsonBody.put("d", deviceName);
-            if(!tracking)
-                jsonBody.put("l", locationName);
-            else
+
+            if(!tracking) {
+                //create a stringreq list
+                for (int i = 0; i < 10; i++) {
+                    jsonBody = new JSONObject();
+                    jsonBody.put("f", familyName);
+                    jsonBody.put("d", deviceName+i);
+                    jsonBody.put("l", locationName);
+                    jsonBody.put("t", System.currentTimeMillis());
+                    JSONObject sensors = new JSONObject();
+                    sensors.put("bluetooth", bluetoothResults);
+                    sensors.put("wifi", wifiResults);
+                    jsonBody.put("s", sensors);
+
+                    final String mRequestBody = jsonBody.toString();
+                    Log.d(TAG, mRequestBody);
+
+                    StringRequest stringRequest = new StringRequest(Request.Method.POST, URL, new Response.Listener<String>() {
+                        @Override
+                        public void onResponse(String response) {
+                            Log.d(TAG, "response"+response);
+
+                        }
+                    }, new Response.ErrorListener() {
+                        @Override
+                        public void onErrorResponse(VolleyError error) {
+                            Log.e(TAG, error.toString());
+                        }
+                    }) {
+                        @Override
+                        public String getBodyContentType() {
+                            return "application/json; charset=utf-8";
+                        }
+
+                        @Override
+                        public byte[] getBody() throws AuthFailureError {
+                            try {
+                                return mRequestBody == null ? null : mRequestBody.getBytes("utf-8");
+                            } catch (UnsupportedEncodingException uee) {
+                                VolleyLog.wtf("Unsupported Encoding while trying to get the bytes of %s using %s", mRequestBody, "utf-8");
+                                return null;
+                            }
+                        }
+
+                        @Override
+                        protected Response<String> parseNetworkResponse(NetworkResponse response) {
+                            String responseString = "";
+                            if (response != null) {
+                                responseString = new String(response.data);
+                            }
+                            return Response.success(responseString, HttpHeaderParser.parseCacheHeaders(response));
+                        }
+                    };
+
+                    queue.add(stringRequest);
+                }
+            }else{
+                jsonBody.put("f", familyName);
+                jsonBody.put("d", deviceName);
                 jsonBody.put("l", "");
-            jsonBody.put("t", System.currentTimeMillis());
-            JSONObject sensors = new JSONObject();
-            sensors.put("bluetooth", bluetoothResults);
-            sensors.put("wifi", wifiResults);
-            jsonBody.put("s", sensors);
+                jsonBody.put("t", System.currentTimeMillis());
+                JSONObject sensors = new JSONObject();
+                sensors.put("bluetooth", bluetoothResults);
+                sensors.put("wifi", wifiResults);
+                jsonBody.put("s", sensors);
+                final String mRequestBody = jsonBody.toString();
+                Log.d(TAG, mRequestBody);
 
+                StringRequest stringRequest = new StringRequest(Request.Method.POST, URL, new Response.Listener<String>() {
+                    @Override
+                    public void onResponse(String response) {
+                        Log.d(TAG, "response"+response);
 
-            final String mRequestBody = jsonBody.toString();
-            Log.d(TAG, mRequestBody);
-
-            StringRequest stringRequest = new StringRequest(Request.Method.POST, URL, new Response.Listener<String>() {
-                @Override
-                public void onResponse(String response) {
-                    Log.d(TAG, "response"+response);
-
-                }
-            }, new Response.ErrorListener() {
-                @Override
-                public void onErrorResponse(VolleyError error) {
-                    Log.e(TAG, error.toString());
-                }
-            }) {
-                @Override
-                public String getBodyContentType() {
-                    return "application/json; charset=utf-8";
-                }
-
-                @Override
-                public byte[] getBody() throws AuthFailureError {
-                    try {
-                        return mRequestBody == null ? null : mRequestBody.getBytes("utf-8");
-                    } catch (UnsupportedEncodingException uee) {
-                        VolleyLog.wtf("Unsupported Encoding while trying to get the bytes of %s using %s", mRequestBody, "utf-8");
-                        return null;
                     }
-                }
-
-                @Override
-                protected Response<String> parseNetworkResponse(NetworkResponse response) {
-                    String responseString = "";
-                    if (response != null) {
-                        responseString = new String(response.data);
+                }, new Response.ErrorListener() {
+                    @Override
+                    public void onErrorResponse(VolleyError error) {
+                        Log.e(TAG, error.toString());
                     }
-                    return Response.success(responseString, HttpHeaderParser.parseCacheHeaders(response));
-                }
-            };
+                }) {
+                    @Override
+                    public String getBodyContentType() {
+                        return "application/json; charset=utf-8";
+                    }
 
-            queue.add(stringRequest);
+                    @Override
+                    public byte[] getBody() throws AuthFailureError {
+                        try {
+                            return mRequestBody == null ? null : mRequestBody.getBytes("utf-8");
+                        } catch (UnsupportedEncodingException uee) {
+                            VolleyLog.wtf("Unsupported Encoding while trying to get the bytes of %s using %s", mRequestBody, "utf-8");
+                            return null;
+                        }
+                    }
+
+                    @Override
+                    protected Response<String> parseNetworkResponse(NetworkResponse response) {
+                        String responseString = "";
+                        if (response != null) {
+                            responseString = new String(response.data);
+                        }
+                        return Response.success(responseString, HttpHeaderParser.parseCacheHeaders(response));
+                    }
+                };
+                queue.add(stringRequest);
+            }
+
+
         } catch (JSONException e) {
             e.printStackTrace();
         }

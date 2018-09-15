@@ -68,6 +68,7 @@ public class MainActivity extends AppCompatActivity {
         eTdevice = findViewById(R.id.editTextDevice);
         eTserver = findViewById(R.id.editTextFamilyServer);
         eTlocation = findViewById(R.id.editTextLocation);
+        //eTlocation.setFocusable(false);
         checkTracking = findViewById(R.id.checkBox);
         checkTracking.setOnClickListener(new View.OnClickListener() {
             @Override
@@ -96,7 +97,7 @@ public class MainActivity extends AppCompatActivity {
                     eTfamily.setError("Family name cannot be empty");
                     eTfamily.setFocusable(true);
                     error = true;
-                }else if(usedNames(family)){
+                }else if(!tracking && usedNames(family)){
                     eTfamily.setError("Use other family name");
                     eTfamily.setFocusable(true);
                     error = true;
@@ -144,7 +145,7 @@ public class MainActivity extends AppCompatActivity {
                         }, new Response.ErrorListener() {
                             @Override
                             public void onErrorResponse(VolleyError error) {
-                                Log.d("Volley",error.getLocalizedMessage());
+                                Log.d("Volley",error.toString());
                             }
                         });
                     }
@@ -190,7 +191,7 @@ public class MainActivity extends AppCompatActivity {
 
             requestQueue.add(stringRequest);
             //Call this code after every 10 seconds to perform realtime tracking
-            handler.postDelayed(startTracking,10000);
+            handler.postDelayed(startTracking,1000);
         }
     };
 
